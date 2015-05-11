@@ -4,21 +4,21 @@
 
   // Set up Smallworld for the appropriate environment. First AMD…
   if (typeof define === 'function' && define.amd) {
-    
+
     define(['exports'], function (exports) {
       root.Smallworld = factory(root, exports);
     });
 
   // Next, for Node.js and CommonJS.
   } else if (typeof exports !== 'undefined') {
-    
+
     factory(root, exports);
-    
+
   // Finally, as a browser global
   } else {
-    
+
     root.Smallworld = factory(root);
- 
+
   }
 
 }(this, function (root) {
@@ -52,20 +52,10 @@
             };
   }());
 
-  // Define default options
-  var defaults = {
-    zoom: 0,
-    center: [0, 0],
-    waterColor: '#b3d1ff',
-    landColor: '#fff',
-    markerColor: '#333',
-    markerSize: 5
-  };
-
   // --------------------------------------------------------------------------
   // Smallworld
   // --------------------------------------------------------------------------
-  
+
   var Smallworld = function (el, options) {
 
     if (!el) {
@@ -91,7 +81,7 @@
   Smallworld.prototype = {
 
     initialize: function () {
-          
+
       // Set the width and height based on our element
       this.width = this.el.clientWidth;
       this.height = this.el.clientHeight;
@@ -139,7 +129,7 @@
       this.context.fillRect(0, 0, this.width, this.height);
 
       // Calculate midpoint of the map. Then, based on the width of the
-      // map and the width of the tile, calculate how many additional 
+      // map and the width of the tile, calculate how many additional
       // tiles must be drawn to the left and right of the center tile.
       // This effectively “wraps” the map tiles.
       centerX = Math.ceil((this.width / 2) - this.tile.center.x);
@@ -180,7 +170,7 @@
   // --------------------------------------------------------------------------
   // Smallworld.Tile
   // --------------------------------------------------------------------------
-  
+
   Smallworld.Tile = function (options) {
     this.options = extend(options || {}, defaults);
     this.initialize.apply(this);
@@ -218,11 +208,11 @@
     },
 
     getBounds: function () {
-        
+
       var bounds = {}, coords, point;
 
       for (var i = 0; i < this.geojson.length; i++) {
-        
+
         coords = this.geojson[i].geometry.coordinates[0];
 
         for (var j = 0; j < coords.length; j++) {
@@ -240,21 +230,21 @@
     },
 
     draw: function () {
-        
+
       // Set the fill of the tile's shapes
       this.context.fillStyle = this.options.landColor;
 
       for (var i = 0; i < this.geojson.length; i++) {
         var coords = this.geojson[i].geometry.coordinates[0];
-        
+
         for (var j = 0; j < coords.length; j++) {
           var point = this.coordinateToPoint(coords[j][1], coords[j][0]);
-          
+
           if (j === 0) {
             this.context.beginPath();
-            this.context.moveTo(point.x, point.y);  
+            this.context.moveTo(point.x, point.y);
           } else {
-            this.context.lineTo(point.x, point.y); 
+            this.context.lineTo(point.x, point.y);
           }
         }
 
@@ -263,7 +253,7 @@
     },
 
     coordinateToPoint: function (latitude, longitude) {
-      
+
       var point = this.projectCoordinate(latitude, longitude);
 
       var xScale = this.width / Math.abs(this.bounds.xMax - this.bounds.xMin);
@@ -278,18 +268,18 @@
     },
 
     projectCoordinate: function (latitude, longitude) {
-      var point = Smallworld.Projection.mercator(latitude, longitude);
+      var point = this.options.projection(latitude, longitude);
       point.x = point.x * this.scale;
       point.y = point.y * this.scale;
       return point;
     },
 
     addMarker: function (point, options) {
-  
+
       options = options || {};
 
       var center = this.coordinateToPoint(point[0], point[1]);
-        
+
       this.context.beginPath();
       this.context.arc(center.x, center.y, this.options.markerSize, 0, 2 * Math.PI, false);
       this.context.fillStyle = this.options.markerColor;
@@ -303,26 +293,58 @@
   // Smallworld.Projection
   // --------------------------------------------------------------------------
 
+  var RADIUS  = 6378137;
+  var MAX     = 85.0511287798;
+  var RADIANS = Math.PI / 180;
+
+  var degToRad = function(deg){
+    return deg * (Math.PI / 180);
+  };
+
+  var radToDeg = function(rad){
+    return rad * (180 / Math.PI);
+  };
+
   Smallworld.Projection = {
-
-    RADIUS: 6378137,
-
-    MAX: 85.0511287798,
-
-    RADIANS: Math.PI / 180,
 
     mercator: function (latitude, longitude) {
       var point = {};
 
-      point.x = this.RADIUS * longitude * this.RADIANS;
-      point.y = Math.max(Math.min(this.MAX, latitude), -this.MAX) * this.RADIANS;
-      point.y = this.RADIUS * Math.log(Math.tan((Math.PI / 4) + (point.y / 2)));
+      point.x = RADIUS * longitude * RADIANS;
+      point.y = Math.max(Math.min(MAX, latitude), -MAX) * RADIANS;
+      point.y = RADIUS * Math.log(Math.tan((Math.PI / 4) + (point.y / 2)));
+
+      return point;
+    },
+
+    kavrayskiy7: function (latitude, longitude) {
+      var point = {};
+      var latRad = degToRad(latitude);
+      var longRad = degToRad(longitude);
+
+      var x = 3 * longRad / 2 * Math.sqrt((1 / 3) - Math.pow((latRad / Math.PI), 2));
+      var y = latRad;
+
+      point.x = radToDeg(x);
+      point.y = radToDeg(y);
 
       return point;
     }
 
   };
 
+  // Define default options
+  var defaults = {
+    zoom: 0,
+    center: [0, 0],
+    waterColor: '#b3d1ff',
+    landColor: '#fff',
+    markerColor: '#333',
+    markerSize: 5,
+    projection: Smallworld.Projection.kavrayskiy7,
+  };
+
   return Smallworld;
 
 }));
+
